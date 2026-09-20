@@ -1,0 +1,26 @@
+eye-blink {{ .Chart.AppVersion }} installed as release "{{ .Release.Name }}".
+
+  API service : {{ include "fd.fullname" . }}-api ({{ .Values.api.service.type }}, port {{ .Values.api.service.port }})
+{{- if .Values.async.enabled }}
+  Workers     : {{ include "fd.fullname" . }}-worker (consuming NATS stream EB_JOBS)
+{{- end }}
+
+Try it (port-forward, then send an image):
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "fd.fullname" . }}-api 8080:{{ .Values.api.service.port }}
+  curl -s -X POST localhost:8080/v1/eye-state \
+    -H 'Content-Type: image/jpeg' \
+{{- if not .Values.auth.disabled }}
+    -H "Authorization: Bearer $API_KEY" \
+{{- end }}
+    --data-binary @photo.jpg
+
+{{ if not .Values.auth.disabled }}
+Authentication is enforced: clients must send a key whose SHA-256 digest is in the configured hashes.
+{{- else }}
+WARNING: auth.disabled=true - make sure an upstream gateway authenticates every request.
+{{- end }}
+{{ if and .Values.async.enabled (not .Values.storage.ensureBucket) }}
+NOTE: the S3 bucket "{{ .Values.storage.bucket }}" must already exist (or set storage.ensureBucket=true).
+{{- end }}
+Run `helm test {{ .Release.Name }}` for a smoke test.

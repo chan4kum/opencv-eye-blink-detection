@@ -1,0 +1,23 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: "What happened?"
+      description: "Include the request ID from the X-Request-ID header if you have one."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: "Steps to reproduce"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: "Version / image tag"
+    validations:
+      required: true

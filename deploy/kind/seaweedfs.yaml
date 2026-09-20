@@ -1,0 +1,43 @@
+# Single-node S3-compatible store for local Kubernetes testing ONLY (ephemeral, dev credentials).
+apiVersion: v1
+kind: Secret
+metadata: {name: s3-credentials}
+type: Opaque
+stringData:
+  access-key-id: devaccesskey
+  secret-access-key: devsecretkey-change-me
+  s3.json: |
+    {"identities":[{"name":"eye-blink","credentials":[{"accessKey":"devaccesskey","secretKey":"devsecretkey-change-me"}],"actions":["Admin","Read","Write","List","Tagging"]}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: seaweedfs, labels: {app: seaweedfs}}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: seaweedfs}}
+  template:
+    metadata: {labels: {app: seaweedfs}}
+    spec:
+      containers:
+        - name: seaweedfs
+          image: chrislusf/seaweedfs:4.47
+          args: [server, -dir=/data, -s3, -s3.config=/etc/seaweedfs/s3.json, -master.volumeSizeLimitMB=128, -volume.max=8]
+          ports: [{containerPort: 8333, name: s3}]
+          readinessProbe:
+            httpGet: {path: /status, port: 8333}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: cfg, mountPath: /etc/seaweedfs, readOnly: true}
+      volumes:
+        - {name: data, emptyDir: {}}
+        - name: cfg
+          secret: {secretName: s3-credentials, items: [{key: s3.json, path: s3.json}]}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: seaweedfs}
+spec:
+  selector: {app: seaweedfs}
+  ports: [{name: s3, port: 8333, targetPort: s3}]

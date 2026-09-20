@@ -1,0 +1,41 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "fd.fullname" . }}
+  labels: {{- include "fd.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "fd.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  endpoints:
+    - {port: http, path: /metrics, interval: {{ .Values.serviceMonitor.interval }}}
+    {{- if .Values.async.enabled }}
+    - {port: metrics, path: /metrics, interval: {{ .Values.serviceMonitor.interval }}}
+    {{- end }}
+{{- end }}
+{{- if .Values.prometheusRule.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "fd.fullname" . }}
+  labels: {{- include "fd.labels" . | nindent 4 }}
+    {{- with .Values.prometheusRule.labels }}{{ toYaml . | nindent 4 }}{{ end }}
+spec:
+{{ .Files.Get "files/alerts.yml" | indent 2 }}
+{{- end }}
+{{- if .Values.grafanaDashboard.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fd.fullname" . }}-dashboard
+  labels: {{- include "fd.labels" . | nindent 4 }}
+    {{ .Values.grafanaDashboard.labelKey }}: {{ .Values.grafanaDashboard.labelValue | quote }}
+data:
+  eye-blink.json: |-
+{{ .Files.Get "files/eye-blink-dashboard.json" | indent 4 }}
+{{- end }}

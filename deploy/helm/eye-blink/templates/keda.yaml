@@ -1,0 +1,21 @@
+{{- if and .Values.async.enabled .Values.worker.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "fd.fullname" . }}-worker
+  labels: {{- include "fd.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef: {name: {{ include "fd.fullname" . }}-worker}
+  minReplicaCount: {{ .Values.worker.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.worker.keda.maxReplicaCount }}
+  cooldownPeriod: 120
+  triggers:
+    - type: nats-jetstream
+      metadata:
+        natsServerMonitoringEndpoint: {{ default (printf "%s-nats-headless.%s.svc:8222" .Release.Name .Release.Namespace) .Values.worker.keda.monitoringEndpoint | quote }}
+        account: {{ .Values.worker.keda.account | quote }}
+        stream: {{ .Values.async.stream | quote }}
+        consumer: {{ .Values.async.consumer | quote }}
+        lagThreshold: {{ .Values.worker.keda.lagThreshold | quote }}
+        useHttps: "false"
+{{- end }}

@@ -1,0 +1,28 @@
+image:
+  repository: opencv-eye-blink-detection
+  tag: dev
+  pullPolicy: IfNotPresent
+auth:
+  # SHA-256 of the throwaway test key "kind-test-key"
+  apiKeyHashes: "6f50a5719cd381552020cba9f36ce6c949077b741054c5739192377b4f201ebf"
+storage:
+  endpointUrl: http://seaweedfs:8333
+  existingSecret: s3-credentials
+  ensureBucket: true
+config:
+  signal: ear   # the synthetic test videos are only recognised via the landmark-geometry signal
+  streamMaxSessions: 4
+
+api:
+  replicaCount: 2
+  autoscaling: {enabled: false}
+  resources: {requests: {cpu: 100m, memory: 384Mi}, limits: {memory: 1Gi}}
+worker:
+  replicaCount: 2
+  autoscaling: {enabled: false}
+  resources: {requests: {cpu: 100m, memory: 384Mi}, limits: {memory: 1Gi}}
+nats:
+  config:
+    jetstream:
+      fileStore:
+        pvc: {size: 1Gi}

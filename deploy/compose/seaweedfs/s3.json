@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "eye-blink",
+      "credentials": [{ "accessKey": "devaccesskey", "secretKey": "devsecretkey-change-me" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

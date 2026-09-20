@@ -1,0 +1,10 @@
+{
+  "fps": 30,
+  "seconds": 6.0,
+  "blinks": [
+    {
+      "start_s": 1.0,
+      "length_s": 2.5
+    }
+  ]
+}

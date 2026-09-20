@@ -1,0 +1,63 @@
+# Prometheus alerting rules. The same expressions are reused by the Helm chart's PrometheusRule.
+groups:
+  - name: eye-blink
+    rules:
+      - alert: EyeBlinkHighErrorRate
+        expr: |
+          sum(rate(eb_http_requests_total{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(eb_http_requests_total[5m])), 1e-9) > 0.02
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "More than 2% of requests are failing with 5xx"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#high-error-rate"
+      - alert: EyeBlinkHighLatency
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(eb_http_request_duration_seconds_bucket{route="/v1/eye-state"}[5m]))) > 0.5
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "p95 latency of /v1/eye-state is above 500 ms"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#high-latency"
+      - alert: EyeBlinkLoadShedding
+        expr: sum(rate(eb_inference_rejected_total[5m])) > 0
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Requests are being shed (503) because inference capacity is exhausted; scale out"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#load-shedding"
+      - alert: EyeBlinkJobsFailing
+        expr: |
+          sum(rate(eb_jobs_processed_total{outcome=~"failed_exhausted|poison"}[10m])) > 0
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "Async jobs are failing after exhausting retries (infrastructure fault, not bad input)"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#jobs-failing"
+      - alert: EyeBlinkQueueBacklog
+        expr: max(nats_consumer_num_pending{consumer_name="eb-workers"}) > 500
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "More than 500 jobs have been waiting for 10 minutes; workers are not keeping up"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#queue-backlog"
+      - alert: EyeBlinkInstanceDown
+        expr: up{job=~"eye-blink-.*"} == 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "A eye-blink instance is not being scraped"
+      - alert: EyeBlinkStreamAtCapacity
+        expr: sum(rate(eb_stream_sessions_closed_total{reason="at_capacity"}[5m])) > 0
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Live-stream connections are being refused (1013): every replica is at its session limit; scale out"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#stream-at-capacity"
+      - alert: EyeBlinkStreamFramesDropped
+        expr: sum(rate(eb_stream_frames_dropped_total{reason="stale"}[5m])) / clamp_min(sum(rate(eb_frames_analyzed_total{source="stream"}[5m])), 1e-9) > 0.2
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "More than 20% of live frames are dropped because analysis cannot keep up (added latency); scale out or lower the client frame rate"
+          runbook_url: "https://github.com/chan4kum/opencv-eye-blink-detection/blob/main/docs/RUNBOOK.md#stream-frames-dropped"

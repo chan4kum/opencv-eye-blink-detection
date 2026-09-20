@@ -1,0 +1,110 @@
+[project]
+name = "opencv-eye-blink-detection"
+version = "1.0.0"
+description = "Production-grade, horizontally scalable eye-blink detection service (MediaPipe Face Landmarker + FastAPI + NATS JetStream)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Chandan Kumar" }]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+  "Typing :: Typed",
+]
+dependencies = [
+    "boto3>=1.43.98",
+    "fastapi>=0.141.1",
+    "nats-py>=2.16.0",
+    "numpy>=2.5.3",
+    "mediapipe>=1.0.1",
+    "opencv-python-headless>=5.0.0.93",
+    "opentelemetry-api>=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-sdk>=1.44.0",
+    "pillow>=12.3.0",
+    "prometheus-client>=0.26.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[project.scripts]
+eye-blink = "eye_blink.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eye_blink"]
+
+[tool.uv]
+# mediapipe declares the GUI build of OpenCV as a hard dependency, which needs desktop X11 libraries
+# and cannot be installed alongside opencv-python-headless. We depend on the headless build instead.
+override-dependencies = ["opencv-contrib-python ; sys_platform == 'never'"]
+
+[dependency-groups]
+dev = [
+    "anyio>=4.15.1",
+    "boto3-stubs[s3]>=1.43.98",
+    "httpx>=0.28.1",
+    "httpx2>=2.13.0",
+    "moto[s3]>=5.2.3",
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.8",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "S", "T20", "PT", "RUF", "ASYNC", "PERF", "PL", "ARG"]
+ignore = ["PLR0913", "PLR2004", "S101"]  # many keyword-only args are intentional; asserts are used in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "ARG", "PLR", "T20", "PT018", "N802", "PLC0415", "SLF001", "ASYNC109", "RUF043", "E501"]
+"src/eye_blink/cli.py" = ["T20"]  # the CLI prints results
+"scripts/**" = ["T20", "S", "E501", "PLR"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["src"]
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["mediapipe.*", "nats.*", "opentelemetry.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --strict-config --cov=eye_blink --cov-report=term-missing"
+markers = [
+  "integration: needs external services (NATS, S3); enabled by setting EB_TEST_NATS_URL / EB_TEST_S3_ENDPOINT",
+]
+filterwarnings = ["error", "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning", "ignore::DeprecationWarning:botocore.*", "ignore::DeprecationWarning:moto.*"]
+
+[tool.coverage.run]
+branch = true
+source = ["eye_blink"]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "pragma: no cover"]
