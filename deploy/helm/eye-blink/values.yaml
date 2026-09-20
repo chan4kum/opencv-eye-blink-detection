@@ -1,0 +1,211 @@
+# Default values for eye-blink. See docs/DEPLOYMENT.md for a production walkthrough.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/chan4kum/opencv-eye-blink-detection
+  tag: ""            # defaults to .Chart.AppVersion
+  digest: ""         # if set, overrides tag (recommended in production: sha256:...)
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}    # e.g. eks.amazonaws.com/role-arn for IAM Roles for Service Accounts (no static S3 keys)
+
+# ---- application configuration (rendered to EB_* environment variables) ----------------------------
+config:
+  logLevel: INFO
+  # Which signal drives blink detection: blendshape (default; trained on real faces), ear (landmark geometry) or max.
+  signal: blendshape
+  minDetectionConfidence: 0.5
+  blinkCloseThreshold: 0.5
+  blinkOpenThreshold: 0.3
+  blinkMinDurationMs: 50
+  blinkMaxDurationMs: 700
+  blinkMaxFaceGapMs: 400
+  maxUploadBytes: 10485760       # single images
+  maxImagePixels: 16000000
+  maxVideoBytes: 52428800        # 50 MiB
+  maxVideoSeconds: 120
+  maxVideoPixels: 2073600        # 1920x1080 per frame
+  maxVideoFrames: 7200
+  videoAnalysisFps: 30
+  videoTimeoutS: 300
+  maxConcurrentInference: 2
+  inferenceQueueTimeoutS: 2.0
+  streamMaxSessions: 8
+  streamMaxFrameBytes: 1048576
+  streamMaxFps: 30
+  streamIdleTimeoutS: 30
+  streamMaxDurationS: 900
+  docsEnabled: false
+  corsAllowOrigins: ""
+  jobTtlS: 3600
+  jobMaxDeliver: 4
+  workerConcurrency: 2
+  deleteInputAfterProcessing: true
+  extraEnv: []       # additional env entries (name/value or valueFrom)
+
+# ---- authentication ---------------------------------------------------------------------------------
+auth:
+  # Comma-separated SHA-256 digests of accepted API keys (generate: `eye-blink keygen`).
+  apiKeyHashes: ""
+  # ...or reference an existing Secret holding the same comma-separated value.
+  existingSecret: ""
+  existingSecretKey: api-key-hashes
+  # Set true ONLY if an upstream gateway / service mesh already authenticates every request.
+  disabled: false
+
+# ---- async pipeline ---------------------------------------------------------------------------------
+async:
+  enabled: true
+  # NATS URL. Empty = the bundled NATS subchart (when nats.enabled), e.g. nats://<release>-nats:4222
+  natsUrl: ""
+  replicas: 1        # JetStream replication factor; use 3 with a 3-node NATS cluster
+  stream: EB_JOBS
+  consumer: eb-workers
+
+storage:
+  bucket: eye-blink
+  endpointUrl: ""    # empty = AWS S3; set for MinIO / SeaweedFS / Ceph / R2 ...
+  region: us-east-1
+  forcePathStyle: true
+  serverSideEncryption: ""   # "", AES256 or aws:kms
+  # Static credentials from an existing Secret (keys: access-key-id, secret-access-key).
+  # Leave empty to use the default AWS credential chain (IRSA / EKS Pod Identity / instance profile).
+  existingSecret: ""
+  # Create the bucket (if missing) and a 1-day expiry rule for orphaned uploads, from an init
+  # container on every API/worker pod. Idempotent. Needs s3:CreateBucket / PutLifecycleConfiguration,
+  # so leave it off when infrastructure-as-code provisions the bucket (recommended in production).
+  ensureBucket: false
+
+otel:
+  endpoint: ""       # e.g. http://otel-collector.observability:4318 ; empty disables tracing
+
+# ---- API deployment ---------------------------------------------------------------------------------
+api:
+  replicaCount: 2
+  # Measured: ~185 MiB idle with a 4-instance pool; ~28 MiB per live stream session (745 MiB at 16 sessions).
+  # One live 30 fps session needs a fraction of a core; size streamMaxSessions to the CPU request.
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {memory: 1Gi}   # no CPU limit: avoids CFS throttling latency spikes
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 65
+  service:
+    type: ClusterIP
+    port: 80
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    # Rate limiting belongs at the edge, e.g. for ingress-nginx. Videos need a larger body limit, and the
+    # live WebSocket (/v1/stream) needs long read/send timeouts:
+    #   nginx.ingress.kubernetes.io/limit-rps: "20"
+    #   nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    #   nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    #   nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    hosts:
+      - host: eye-blink.example.com
+        paths: [{path: /, pathType: Prefix}]
+    tls: []
+  podDisruptionBudget:
+    minAvailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# ---- worker deployment ------------------------------------------------------------------------------
+worker:
+  replicaCount: 2
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {memory: 1Gi}
+  autoscaling:
+    enabled: true            # CPU-based HPA (ignored when keda.enabled)
+    minReplicas: 2
+    maxReplicas: 30
+    targetCPUUtilizationPercentage: 70
+  keda:
+    enabled: false           # scale on JetStream consumer lag; requires KEDA installed in the cluster
+    minReplicaCount: 1
+    maxReplicaCount: 50
+    lagThreshold: "20"
+    # NATS monitoring endpoint (host:8222). Empty = the bundled subchart's service.
+    monitoringEndpoint: ""
+    account: "$G"
+  podDisruptionBudget:
+    minAvailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+
+# ---- pod/container hardening (restricted Pod Security Standard) -----------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile: {type: RuntimeDefault}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+
+terminationGracePeriodSeconds: 45
+topologySpreadConstraints:
+  enabled: true
+
+networkPolicy:
+  enabled: true
+  # Namespaces/pods allowed to reach the API (ingress controller, monitoring). Empty = same namespace only.
+  apiIngressFrom: []
+  metricsFrom: []            # e.g. [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]
+  # Egress allowed to the object store when it is external (CIDR blocks / ports).
+  storageEgress:
+    - ports: [{port: 443, protocol: TCP}, {port: 8333, protocol: TCP}, {port: 9000, protocol: TCP}]
+
+# ---- observability integration (requires prometheus-operator CRDs) --------------------------------
+serviceMonitor:
+  enabled: false
+  interval: 15s
+  labels: {}
+prometheusRule:
+  enabled: false
+  labels: {}
+grafanaDashboard:
+  enabled: false
+  labelKey: grafana_dashboard   # sidecar label used by the Grafana Helm chart
+  labelValue: "1"
+
+# ---- bundled NATS JetStream (official nats-io chart) ---------------------------------------------
+# For production use a 3-node cluster with persistence and set async.replicas=3.
+nats:
+  enabled: true
+  config:
+    cluster:
+      enabled: false
+      replicas: 3
+    jetstream:
+      enabled: true
+      fileStore:
+        enabled: true
+        pvc:
+          enabled: true
+          size: 10Gi
+    monitor:
+      enabled: true
+  promExporter:
+    enabled: true
+    podMonitor:
+      enabled: false
+  natsBox:
+    enabled: false

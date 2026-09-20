@@ -1,0 +1,8 @@
+# Allow the documented, development-only credentials used by the local Compose/kind test stacks.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Development-only credentials (never used outside local test environments)"
+regexes = ['''devsecretkey-change-me''', '''devaccesskey''', '''kind-test-key''']
+paths = ['''deploy/kind/.*''', '''deploy/compose/seaweedfs/s3\.json''']

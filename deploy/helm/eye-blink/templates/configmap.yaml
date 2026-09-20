@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fd.fullname" . }}
+  labels: {{- include "fd.labels" . | nindent 4 }}
+data:
+  EB_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  EB_SIGNAL: {{ .Values.config.signal | quote }}
+  EB_MIN_DETECTION_CONFIDENCE: {{ .Values.config.minDetectionConfidence | quote }}
+  EB_BLINK_CLOSE_THRESHOLD: {{ .Values.config.blinkCloseThreshold | quote }}
+  EB_BLINK_OPEN_THRESHOLD: {{ .Values.config.blinkOpenThreshold | quote }}
+  EB_BLINK_MIN_DURATION_MS: {{ .Values.config.blinkMinDurationMs | quote }}
+  EB_BLINK_MAX_DURATION_MS: {{ .Values.config.blinkMaxDurationMs | quote }}
+  EB_BLINK_MAX_FACE_GAP_MS: {{ .Values.config.blinkMaxFaceGapMs | quote }}
+  EB_MAX_UPLOAD_BYTES: {{ .Values.config.maxUploadBytes | int64 | quote }}
+  EB_MAX_IMAGE_PIXELS: {{ .Values.config.maxImagePixels | int64 | quote }}
+  EB_MAX_VIDEO_BYTES: {{ .Values.config.maxVideoBytes | int64 | quote }}
+  EB_MAX_VIDEO_SECONDS: {{ .Values.config.maxVideoSeconds | quote }}
+  EB_MAX_VIDEO_PIXELS: {{ .Values.config.maxVideoPixels | int64 | quote }}
+  EB_MAX_VIDEO_FRAMES: {{ .Values.config.maxVideoFrames | int64 | quote }}
+  EB_VIDEO_ANALYSIS_FPS: {{ .Values.config.videoAnalysisFps | quote }}
+  EB_VIDEO_TIMEOUT_S: {{ .Values.config.videoTimeoutS | quote }}
+  EB_MAX_CONCURRENT_INFERENCE: {{ .Values.config.maxConcurrentInference | quote }}
+  EB_INFERENCE_QUEUE_TIMEOUT_S: {{ .Values.config.inferenceQueueTimeoutS | quote }}
+  EB_STREAM_MAX_SESSIONS: {{ .Values.config.streamMaxSessions | quote }}
+  EB_STREAM_MAX_FRAME_BYTES: {{ .Values.config.streamMaxFrameBytes | int64 | quote }}
+  EB_STREAM_MAX_FPS: {{ .Values.config.streamMaxFps | quote }}
+  EB_STREAM_IDLE_TIMEOUT_S: {{ .Values.config.streamIdleTimeoutS | quote }}
+  EB_STREAM_MAX_DURATION_S: {{ .Values.config.streamMaxDurationS | quote }}
+  EB_DOCS_ENABLED: {{ .Values.config.docsEnabled | quote }}
+  EB_CORS_ALLOW_ORIGINS: {{ .Values.config.corsAllowOrigins | quote }}
+  EB_JOB_TTL_S: {{ .Values.config.jobTtlS | quote }}
+  EB_JOB_MAX_DELIVER: {{ .Values.config.jobMaxDeliver | quote }}
+  EB_WORKER_CONCURRENCY: {{ .Values.config.workerConcurrency | quote }}
+  EB_DELETE_INPUT_AFTER_PROCESSING: {{ .Values.config.deleteInputAfterProcessing | quote }}
+  EB_NATS_PROVISION: "true"

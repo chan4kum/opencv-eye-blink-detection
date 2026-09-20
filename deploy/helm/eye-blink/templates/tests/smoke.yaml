@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "fd.fullname" . }}-smoke-test
+  labels: {{- include "fd.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext: {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: smoke
+      image: {{ include "fd.image" . | quote }}
+      securityContext: {{- toYaml .Values.securityContext | nindent 8 }}
+      command:
+        - python
+        - -c
+        - |
+          import json, urllib.request as u
+          base = "http://{{ include "fd.fullname" . }}-api:{{ .Values.api.service.port }}"
+          for path in ("/healthz", "/readyz"):
+              with u.urlopen(base + path, timeout=5) as r:  # raises on non-2xx, failing the test
+                  print(path, r.status, json.load(r))
+      volumeMounts:
+        - {name: tmp, mountPath: /tmp}
+  volumes:
+    - {name: tmp, emptyDir: {}}

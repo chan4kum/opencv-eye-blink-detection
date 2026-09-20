@@ -1,0 +1,60 @@
+{{- if .Values.networkPolicy.enabled }}
+# API: accepts traffic on 8000 from allowed sources; may reach DNS, NATS and object storage.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "fd.fullname" . }}-api
+  labels: {{- include "fd.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "fd.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        {{- with .Values.networkPolicy.apiIngressFrom }}{{ toYaml . | nindent 8 }}{{ end }}
+      ports: [{port: 8000, protocol: TCP}]
+    {{- with .Values.networkPolicy.metricsFrom }}
+    - from: {{- toYaml . | nindent 8 }}
+      ports: [{port: 8000, protocol: TCP}]
+    {{- end }}
+  egress:
+    - to: [{namespaceSelector: {}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to: [{podSelector: {}}]
+      ports: [{port: 4222, protocol: TCP}]
+    {{- range .Values.networkPolicy.storageEgress }}
+    - ports: {{- toYaml .ports | nindent 8 }}
+    {{- end }}
+    {{- if .Values.otel.endpoint }}
+    - ports: [{port: 4318, protocol: TCP}]
+    {{- end }}
+{{- if .Values.async.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "fd.fullname" . }}-worker
+  labels: {{- include "fd.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "fd.selectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        {{- with .Values.networkPolicy.metricsFrom }}{{ toYaml . | nindent 8 }}{{ end }}
+      ports: [{port: 9000, protocol: TCP}]
+  egress:
+    - to: [{namespaceSelector: {}, podSelector: {matchLabels: {k8s-app: kube-dns}}}]
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to: [{podSelector: {}}]
+      ports: [{port: 4222, protocol: TCP}]
+    {{- range .Values.networkPolicy.storageEgress }}
+    - ports: {{- toYaml .ports | nindent 8 }}
+    {{- end }}
+    {{- if .Values.otel.endpoint }}
+    - ports: [{port: 4318, protocol: TCP}]
+    {{- end }}
+{{- end }}
+{{- end }}

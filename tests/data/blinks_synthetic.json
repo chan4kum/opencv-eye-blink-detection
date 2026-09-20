@@ -1,0 +1,22 @@
+{
+  "fps": 30,
+  "seconds": 10.0,
+  "blinks": [
+    {
+      "start_s": 2.0,
+      "length_s": 0.3
+    },
+    {
+      "start_s": 4.5,
+      "length_s": 0.3
+    },
+    {
+      "start_s": 5.1,
+      "length_s": 0.3
+    },
+    {
+      "start_s": 8.0,
+      "length_s": 0.25
+    }
+  ]
+}
