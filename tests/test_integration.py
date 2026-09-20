@@ -51,6 +51,16 @@ class Rig:
     start_worker: Callable[[], Any]
 
 
+def object_exists(rig: Rig, key: str) -> bool:
+    try:
+        rig.store._client.head_object(Bucket=rig.settings.s3_bucket, Key=key)
+    except Exception as exc:
+        if any(marker in str(exc) for marker in ("NoSuchKey", "Not Found", "404")):
+            return False
+        raise
+    return True
+
+
 async def wait_terminal(
     client: httpx.AsyncClient, job_id: str, headers: dict[str, str] | None = None, timeout: float = 30
 ) -> dict[str, Any]:
@@ -141,8 +151,11 @@ async def test_job_lifecycle_and_input_deleted(rig: Rig, video_bytes: bytes) -> 
     job = r.json()
     done = await wait_terminal(rig.client, job["job_id"], AUTH_A)
     assert done["status"] == "succeeded" and done["result"]["blink_count"] == 2 and done["attempts"] == 1
-    with pytest.raises(Exception, match="NoSuchKey|Not Found|404"):
-        rig.store._client.head_object(Bucket=rig.settings.s3_bucket, Key=f"inputs/{job['job_id']}")
+    # The worker deletes the input *after* it persists the result and acks, so poll instead of asserting immediately.
+    deadline = time.monotonic() + 10
+    while object_exists(rig, f"inputs/{job['job_id']}"):
+        assert time.monotonic() < deadline, "input object was not deleted after processing"
+        await asyncio.sleep(0.1)
 
 
 async def test_api_and_worker_are_decoupled(rig: Rig, video_bytes: bytes) -> None:
