@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with: {enable-cache: true}
       - run: uv sync --all-groups
       - run: uv run ruff check .
@@ -37,7 +37,7 @@ jobs:
         python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with: {enable-cache: true, python-version: "${{ matrix.python }}"}
       - name: MediaPipe runtime libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgles2
@@ -65,7 +65,7 @@ jobs:
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:8333/status >/dev/null && break; sleep 1; done
       - name: MediaPipe runtime libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libegl1 libgles2
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.2.0
         with: {enable-cache: true}
       - run: uv sync --all-groups
       - name: Unit + integration with the combined coverage gate
