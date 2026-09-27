@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.9
 
 # ---- build: resolve and install dependencies into a virtualenv ------------------------------------
-FROM python:3.12-slim-bookworm AS build
+FROM python:3.14-slim-bookworm AS build
 COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /usr/local/bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_NO_CACHE=1
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN uv sync --frozen --no-dev --no-editable
 
 # ---- runtime libraries shared by the test and runtime stages -----------------------------------------
 # MediaPipe's native runtime links against EGL/GLES even for CPU inference.
-FROM python:3.12-slim-bookworm AS libs
+FROM python:3.14-slim-bookworm AS libs
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libegl1 libgles2 \
  && rm -rf /var/lib/apt/lists/*
