@@ -97,7 +97,7 @@ services:
   # ---- observability (profile) ------------------------------------------------------------------
   nats-exporter:
     profiles: [observability]
-    image: natsio/prometheus-nats-exporter:0.20.2
+    image: natsio/prometheus-nats-exporter:0.20.3
     command: ["-jsz=all", "-varz", "http://nats:8222"]
     depends_on: {nats: {condition: service_healthy}}
 
